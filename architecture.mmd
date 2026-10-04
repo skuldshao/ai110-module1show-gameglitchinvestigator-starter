@@ -1,0 +1,40 @@
+flowchart TD
+    User([Player in browser]) -->|click / type| Rerun[Streamlit reruns app.py top to bottom]
+
+    subgraph app["app.py (UI + state)"]
+        Rerun --> Diff[Sidebar: difficulty -> get_range_for_difficulty]
+        Diff --> Init{Keys already in st.session_state?}
+        Init -->|no, first run| Create[Create secret, attempts, score, status, history]
+        Init -->|yes| Keep[Reuse existing values]
+        Create --> Status
+        Keep --> Status
+        Status{status == playing?} -->|no| Stop[Show won / game over and st.stop]
+        Status -->|yes, Submit clicked| Parse[parse_guess raw input]
+        Parse -->|invalid| Err[Show error, add to history]
+        Parse -->|valid int| Check[check_guess guess, secret as int]
+        Check --> Score[update_score]
+        Score --> Outcome{outcome}
+        Outcome -->|Win| Won[status = won, balloons]
+        Outcome -->|Too High / Too Low| Limit{attempts >= limit?}
+        Limit -->|yes| Lost[status = lost]
+        Limit -->|no| Hint[Show hint: Go LOWER / Go HIGHER]
+    end
+
+    subgraph logic["logic_utils.py (pure functions)"]
+        L1[get_range_for_difficulty]
+        L2[parse_guess]
+        L3[check_guess -> outcome, message]
+        L4[update_score]
+    end
+
+    subgraph tests["tests/test_game_logic.py (pytest)"]
+        T[6 tests: win, too high, too low, hint direction x2, numeric comparison]
+    end
+
+    Diff -.calls.-> L1
+    Parse -.calls.-> L2
+    Check -.calls.-> L3
+    Score -.calls.-> L4
+    T -.imports.-> L3
+
+    State[(st.session_state: secret, attempts, score, status, history)] <-.persists across reruns.-> Init
